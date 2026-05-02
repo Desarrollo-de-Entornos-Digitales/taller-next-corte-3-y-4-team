@@ -1,4 +1,4 @@
-import axiosClient from '@/lib/axios/client';
+import axiosClient from '../../../../lib/axios/client';
 
 interface LoginResponse {
     access_token: string;
@@ -15,7 +15,7 @@ interface LoginResponse {
 class LoginService {
     async login(email: string, password: string): Promise<LoginResponse> {
         const result = await axiosClient.post('/auth/login', { email, password });
-        return result.data as LoginResponse;
+        return result.data;
     }
 }
 
