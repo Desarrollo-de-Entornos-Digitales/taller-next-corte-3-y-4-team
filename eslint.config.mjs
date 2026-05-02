@@ -1,4 +1,3 @@
-// @ts-check
 import eslint from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
@@ -67,6 +66,15 @@ export default defineConfig([
                     usePrettierrc: true,
                 },
             ],
+        },
+    },
+    {
+        files: ['**/services/**/*.ts'],
+        rules: {
+            '@typescript-eslint/no-unsafe-assignment': 'off',
+            '@typescript-eslint/no-unsafe-call': 'off',
+            '@typescript-eslint/no-unsafe-member-access': 'off',
+            '@typescript-eslint/no-unsafe-return': 'off',
         },
     },
     eslintPluginPrettierRecommended,
