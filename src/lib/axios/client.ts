@@ -1,8 +1,10 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 
-const axiosClient: AxiosInstance = axios.create({
+const axiosClient = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 export default axiosClient;
