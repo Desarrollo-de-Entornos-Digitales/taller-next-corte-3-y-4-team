@@ -1,4 +1,4 @@
-import axiosClient from '@app/utils/axios-client';
+import axiosClient from '@/lib/axios/client';
 
 export interface CreativeArea {
     id: number;
