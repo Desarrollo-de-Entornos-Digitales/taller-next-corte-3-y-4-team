@@ -1,4 +1,4 @@
-import axiosClient from '@/lib/axios/client';
+import axiosClient from '../../../../lib/axios/client';
 
 export interface CreativeArea {
     id: number;
@@ -7,7 +7,16 @@ export interface CreativeArea {
 
 class CreativeAreaService {
     async getCreativeAreas(): Promise<CreativeArea[]> {
-        const result = await axiosClient.get('/creative-areas');
+        const token = localStorage.getItem('token');
+        if (!token) {
+            throw new Error('No hay token de autenticación');
+        }
+
+        const result = await axiosClient.get('/creative-areas', {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
         return result.data;
     }
 }
