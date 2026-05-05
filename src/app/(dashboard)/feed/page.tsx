@@ -56,6 +56,12 @@ export default function Feed() {
       <div className="p-4 max-w-6xl mx-auto">
         <ProgressCard streak={streak} totalExercises={totalExercises} />
 
+        {/* CUADRO GRIS - PARA VER LOS DATOS */}
+        <div className="bg-gray-100 p-3 rounded-md text-xs mb-4 overflow-auto">
+          <strong>Datos recibidos del backend:</strong>
+          <pre>{JSON.stringify(exercises, null, 2)}</pre>
+        </div>
+
         <div className="mt-8">
           <h2 className="text-xl font-bold mb-4">✨ Para ti</h2>
           <div className="flex gap-4 overflow-x-auto pb-4">
