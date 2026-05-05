@@ -7,4 +7,6 @@ const axiosClient = axios.create({
     },
 });
 
+console.log("API Base URL:", process.env.NEXT_PUBLIC_API_URL);
+
 export default axiosClient;
