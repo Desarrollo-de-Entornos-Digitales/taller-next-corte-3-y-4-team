@@ -1,18 +1,31 @@
 interface ExerciseCardProps {
   title: string;
-  duration: string;
-  bgColor?: string;
+  duration: number;
+  type: string;
+  onClick: () => void;
 }
 
-export default function ExerciseCard({ title, duration, bgColor = "bg-pink-200" }: ExerciseCardProps) {
+export default function ExerciseCard({ title, duration, type, onClick }: ExerciseCardProps) {
   return (
-    <div className={`${bgColor} p-4 rounded-2xl shadow-md min-w-[160px]`}>
-      <p className="text-sm font-medium">Gimnasia creativa</p>
-      <h3 className="font-bold text-lg">{title}</h3>
-      <p className="text-xs text-gray-600 mt-2">⏱️ {duration} min</p>
-      <div className="mt-3 w-8 h-8 bg-white rounded-full flex items-center justify-center">
-        ▶️
+    <div
+      onClick={onClick}
+      style={{
+        backgroundColor: "lightblue",
+        border: "2px solid black",
+        borderRadius: "16px",
+        padding: "16px",
+        minWidth: "180px",
+        cursor: "pointer",
+      }}
+    >
+      <div>
+        <span style={{ backgroundColor: "gray", padding: "4px 8px", borderRadius: "20px", color: "white" }}>
+          {type}
+        </span>
+        <span style={{ marginLeft: "8px" }}>⏱️ {duration} min</span>
       </div>
+      <h3 style={{ color: "red", fontWeight: "bold", fontSize: "18px" }}>{title}</h3>
+      <p style={{ color: "black" }}>Ejercicio para tu creatividad</p>
     </div>
   );
 }
