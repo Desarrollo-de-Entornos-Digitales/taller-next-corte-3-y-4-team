@@ -6,6 +6,30 @@ import { useRouter } from 'next/navigation';
 import { creativeAreaService, CreativeArea } from './services/creative-area.service';
 import onboardingAction from './onboarding.action';
 
+interface TokenPayload {
+    sub?: string | number;
+}
+
+// Función para obtener el userId del token
+function getUserIdFromToken(): number | null {
+    if (typeof window === 'undefined') return null;
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+
+    try {
+        const payload = JSON.parse(atob(parts[1])) as TokenPayload;
+        const sub = payload.sub;
+        if (typeof sub === 'number') return sub;
+        if (typeof sub === 'string' && /^\d+$/.test(sub)) return Number(sub);
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 export default function Onboarding() {
     const router = useRouter();
     const [areas, setAreas] = useState<CreativeArea[]>([]);
@@ -23,26 +47,41 @@ export default function Onboarding() {
                 setError('Error al cargar las áreas creativas');
             }
         };
-        fetchAreas();
+        void fetchAreas();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedArea) return;
 
+        const userId = getUserIdFromToken();
+        if (!userId) {
+            setError('No se pudo identificar al usuario. Por favor, inicia sesión nuevamente.');
+            router.push('/login');
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setError('No hay token de autenticación');
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
-            // Asumiendo userId = 1 por ahora, en producción obtener del token
-            const userId = 1;
-            await onboardingAction(selectedArea, userId);
-            router.push('/dashboard'); // o donde corresponda después del onboarding
-        } catch (err) {
+            await onboardingAction(selectedArea, userId, token);
+            router.push('/feed');
+        } catch (err: unknown) {
             console.error('Error in onboarding:', err);
-            setError('Error al completar el onboarding');
-        } finally {
-            setLoading(false);
+            // Si es 409 (conflicto, perfil ya existe), redirigir al feed igual
+            const error = err as { response?: { status?: number } };
+            if (error.response?.status === 409) {
+                router.push('/feed');
+            } else {
+                setError('Error al completar el onboarding');
+            }
         }
     };
 
@@ -54,7 +93,7 @@ export default function Onboarding() {
 
                 {error && <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">{error}</div>}
 
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={(e) => void handleSubmit(e)}>
                     <select
                         value={selectedArea || ''}
                         onChange={(e) => setSelectedArea(Number(e.target.value))}
