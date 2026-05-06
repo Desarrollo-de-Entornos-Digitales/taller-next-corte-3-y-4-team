@@ -1,21 +1,25 @@
-import axios from "axios";
+const API_URL = "http://127.0.0.1:3000";
 
-const axiosClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-  headers: { "Content-Type": "application/json" },
+const getAuthHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem("token")}`,
+  "Content-Type": "application/json",
 });
 
 export const feedService = {
   getExercises: async () => {
-    const response = await axiosClient.get("/exercises");
-    return response.data;
+    const res = await fetch(`${API_URL}/exercises`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+    return res.json();
   },
   getStreak: async () => {
-    const response = await axiosClient.get("/exercise-history/me/streak");
-    return response.data;
+    const res = await fetch(`${API_URL}/exercise-history/me/streak`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+    return res.json();
   },
   getTotalExercises: async () => {
-    const response = await axiosClient.get("/exercise-history/me");
-    return response.data.length;
+    const res = await fetch(`${API_URL}/exercise-history/me`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    return data.length;
   },
 };
