@@ -1,25 +1,16 @@
-const API_URL = "http://127.0.0.1:3000";
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-  "Content-Type": "application/json",
-});
+import axiosClient from "@/lib/axios/client";
 
 export const feedService = {
   getExercises: async () => {
-    const res = await fetch(`${API_URL}/exercises`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
-    return res.json();
+    const response = await axiosClient.get("/exercises");
+    return response.data;
   },
   getStreak: async () => {
-    const res = await fetch(`${API_URL}/exercise-history/me/streak`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
-    return res.json();
+    const response = await axiosClient.get("/exercise-history/me/streak");
+    return response.data;
   },
   getTotalExercises: async () => {
-    const res = await fetch(`${API_URL}/exercise-history/me`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
-    const data = await res.json();
-    return data.length;
+    const response = await axiosClient.get("/exercise-history/me");
+    return response.data.length;
   },
 };
