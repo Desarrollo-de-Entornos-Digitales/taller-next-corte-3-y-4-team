@@ -68,6 +68,7 @@ export default defineConfig([
             ],
         },
     },
+    // 👇 REGLAS ESPECÍFICAS PARA ARCHIVOS DENTRO DE CARPETAS "services"
     {
         files: ['**/services/**/*.ts'],
         rules: {
