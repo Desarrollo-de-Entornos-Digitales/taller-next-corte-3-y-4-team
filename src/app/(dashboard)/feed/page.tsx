@@ -102,6 +102,9 @@ export default function Feed() {
     const [userName, setUserName] = useState('Usuario');
     const [selectedMood, setSelectedMood] = useState<string | null>(null);
     const [streak, setStreak] = useState(0);
+    const [page, setPage] = useState(1);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -146,6 +149,29 @@ export default function Feed() {
             router.push(`/exercises/${random.id}`);
         }
     };
+
+    const loadMoreExercises = async () => {
+  if (loadingMore || !hasMore) return;
+  setLoadingMore(true);
+  try {
+    const nextPage = page + 1;
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercises?page=${nextPage}&limit=4`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const newExercises = await response.json();
+    if (newExercises.length === 0) {
+      setHasMore(false);
+    } else {
+      setExercises([...exercises, ...newExercises]);
+      setPage(nextPage);
+    }
+  } catch (error) {
+    console.error("Error cargando más ejercicios:", error);
+  } finally {
+    setLoadingMore(false);
+  }
+};
 
     return (
         <div className="min-h-screen font-[Nunito,sans-serif]" style={{ background: '#EDE8DC' }}>
@@ -307,7 +333,19 @@ export default function Feed() {
                         </div>
                     </div>
                 </div>
+                {hasMore && (
+                    <div className="flex justify-center mt-6">
+                      <button
+                          onClick={loadMoreExercises}
+                          disabled={loadingMore}
+                          className="px-6 py-2 rounded-full font-semibold text-white bg-purple-500 hover:bg-purple-600 transition"
+                        >
+                          {loadingMore ? "Cargando..." : "Cargar más"}
+                       </button>
+                    </div>        
+                )}     
             </div>
         </div>
     );
 }
+
