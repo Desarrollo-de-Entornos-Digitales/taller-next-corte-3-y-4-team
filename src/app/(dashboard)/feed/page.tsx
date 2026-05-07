@@ -101,6 +101,7 @@ export default function Feed() {
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('Usuario');
     const [selectedMood, setSelectedMood] = useState<string | null>(null);
+    const [streak, setStreak] = useState(0);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -108,6 +109,22 @@ export default function Feed() {
             const payload = JSON.parse(atob(token.split('.')[1]));
             setUserName(payload.name || payload.email.split('@')[0]);
         }
+
+        const loadStreak = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercise-history/me/streak`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setStreak(data.streak || 0);
+                }
+            } catch (error) {
+                console.error('Error cargando racha:', error);
+            }
+        };
+        loadStreak();
 
         const loadExercises = async () => {
             try {
@@ -269,6 +286,26 @@ export default function Feed() {
                             ))}
                         </div>
                     )}
+                </div>
+                {/* ── Tarjeta de racha (nuevo) ── */}
+                <div className="mb-6">
+                    <div
+                        className="bg-white rounded-[22px] p-4 flex justify-between items-center"
+                        style={{ border: '2.5px solid #1A1A1A', boxShadow: '5px 5px 0px #1A1A1A' }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-3xl">🔥</span>
+                            <div>
+                                <p className="font-black text-[#1C1C1C]">Llevas {streak} días seguidos</p>
+                                <p className="text-sm font-semibold" style={{ color: '#555566' }}>
+                                    ¡Sigue así!
+                                </p>
+                            </div>
+                        </div>
+                        <div className="w-12 h-12 border-2 border-[#F4A97F] rounded-full flex items-center justify-center font-black text-[#E8855A]">
+                            {streak}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
