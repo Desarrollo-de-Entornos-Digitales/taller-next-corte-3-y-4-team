@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
 import registerAction from './register.action';
 
 export default function RegisterPage() {
@@ -17,7 +18,7 @@ export default function RegisterPage() {
         const password = String(formData.get('password'));
         const result = await registerAction(name, email, password);
         localStorage.setItem('token', result.access_token);
-        router.push('/feed');
+        router.push('/onboarding');
     };
 
     return (
