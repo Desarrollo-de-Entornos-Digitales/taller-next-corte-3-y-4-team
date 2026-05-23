@@ -3,20 +3,29 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import loginAction from './login.action';
+import { useNotifications } from '@/context/NotificationContext';
 
 export default function LoginPage() {
     const formRef = useRef<HTMLFormElement>(null);
     const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
+    const { showNotification } = useNotifications();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData(formRef.current!);
         const email = String(formData.get('email'));
         const password = String(formData.get('password'));
-        const result = await loginAction(email, password);
-        localStorage.setItem('token', result.access_token);
-        router.push('/feed');
+
+        try {
+            const result = await loginAction(email, password);
+            localStorage.setItem('token', result.access_token);
+            showNotification('Inicio de sesión exitoso', 'success');
+            router.push('/feed');
+        } catch (error) {
+            console.error('Error en login:', error);
+            showNotification('Credenciales inválidas', 'error');
+        }
     };
 
     return (
