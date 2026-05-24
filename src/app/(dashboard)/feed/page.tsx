@@ -178,11 +178,25 @@ export default function Feed() {
             <Header />
 
             <div className="max-w-2xl mx-auto px-5 pt-10 pb-28 md:pb-16">
-                {/* ── Saludo ── */}
+                {/* ── Saludo y botones de navegación ── */}
                 <div className="mb-7">
                     <h1 className="text-[32px] font-black tracking-tight" style={{ color: '#1C1C1C' }}>
                         ¡Hola, {userName}!
                     </h1>
+                    <div className="flex gap-3 mt-4">
+                        <button
+                            onClick={() => router.push('/achievements')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
+                        >
+                            🏆 Mis Logros
+                        </button>
+                        <button
+                            onClick={() => router.push('/history')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
+                        >
+                            📋 Historial
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── Mood card (expandida a todo el ancho en desktop) ── */}
