@@ -38,7 +38,12 @@ export default function AchievementsPage() {
         const achievementsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/achievements`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const allAchievements = await achievementsRes.json();
+        let allAchievements = await achievementsRes.json();
+
+        // Asegurar que sea un array
+        if (allAchievements && !Array.isArray(allAchievements)) {
+          allAchievements = allAchievements.data || [];
+        }
         setAchievements(allAchievements);
 
         // Obtener logros del usuario
@@ -46,7 +51,12 @@ export default function AchievementsPage() {
           `${process.env.NEXT_PUBLIC_API_URL}/user-achievements/user/${userId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        const userAchievementsData = await userAchievementsRes.json();
+        let userAchievementsData = await userAchievementsRes.json();
+
+        // Asegurar que sea un array
+        if (userAchievementsData && !Array.isArray(userAchievementsData)) {
+          userAchievementsData = userAchievementsData.data || [];
+        }
         setUserAchievements(userAchievementsData);
       } catch (error) {
         console.error(error);

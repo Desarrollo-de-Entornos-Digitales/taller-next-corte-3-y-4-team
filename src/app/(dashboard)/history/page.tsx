@@ -42,7 +42,13 @@ export default function HistoryPage() {
           throw new Error("Error al cargar el historial");
         }
 
-        const data = await response.json();
+        let data = await response.json();
+
+        // Asegurar que sea un array
+        if (data && !Array.isArray(data)) {
+          data = data.data || [];
+        }
+
         setHistory(data);
       } catch (error) {
         console.error(error);
