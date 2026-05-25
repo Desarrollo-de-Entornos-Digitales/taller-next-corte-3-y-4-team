@@ -24,11 +24,8 @@ export default function CatalogPage() {
     const { showNotification } = useNotifications();
     const [exercises, setExercises] = useState<Exercise[]>([]);
     const [loading, setLoading] = useState(true);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [searchTerm, setSearchTerm] = useState('');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [selectedType, setSelectedType] = useState<string>('');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [exerciseTypes, setExerciseTypes] = useState<ExerciseType[]>([]);
 
     useEffect(() => {
@@ -40,7 +37,6 @@ export default function CatalogPage() {
                     return;
                 }
 
-                // Cargar ejercicios
                 const exercisesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercises`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
@@ -53,7 +49,6 @@ export default function CatalogPage() {
                 }
                 setExercises(exercisesData);
 
-                // Cargar tipos de ejercicio
                 const typesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercise-types`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
@@ -107,10 +102,68 @@ export default function CatalogPage() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Catálogo de Ejercicios</h1>
                 <p className="text-gray-500 mb-6">{filteredExercises.length} ejercicios disponibles</p>
 
-                {/* Filtros*/}
-                <div className="text-center py-10">
-                    <p className="text-gray-400">Próximamente: filtros y lista de ejercicios</p>
+                {/* Barra de búsqueda y filtros */}
+                <div className="mb-8 space-y-4">
+                    <input
+                        type="text"
+                        placeholder="🔍 Buscar ejercicio..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full px-5 py-3 rounded-full border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition bg-white"
+                    />
+
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => setSelectedType('')}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                                selectedType === ''
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                            }`}
+                        >
+                            Todos
+                        </button>
+                        {exerciseTypes.map((type) => (
+                            <button
+                                key={type.id}
+                                onClick={() => setSelectedType(type.type)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                                    selectedType === type.type
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                                }`}
+                            >
+                                {type.type}
+                            </button>
+                        ))}
+                    </div>
                 </div>
+
+                {/* Grid de ejercicios */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredExercises.map((exercise) => (
+                        <div
+                            key={exercise.id}
+                            onClick={() => router.push(`/exercises/${exercise.id}`)}
+                            className="bg-white rounded-2xl p-5 shadow-md border border-gray-200 cursor-pointer hover:shadow-lg transition hover:-translate-y-1"
+                        >
+                            <h3 className="font-bold text-gray-900 text-lg mb-1">{exercise.name}</h3>
+                            <p className="text-sm text-gray-500 mb-2 line-clamp-2">{exercise.description}</p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-500">⏱️ {exercise.duration} min</span>
+                                <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                                    {exercise.exerciseType?.type || 'Ejercicio'}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {filteredExercises.length === 0 && (
+                    <div className="text-center py-12">
+                        <p className="text-gray-400">No se encontraron ejercicios</p>
+                    </div>
+                )}
             </div>
         </div>
     );
