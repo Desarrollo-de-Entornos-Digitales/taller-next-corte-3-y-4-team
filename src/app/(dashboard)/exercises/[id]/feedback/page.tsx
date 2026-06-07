@@ -51,54 +51,64 @@ export default function FeedbackPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center p-5">
-            <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-                {/* Icono de celebración */}
-                <div className="text-7xl mb-4">🎉✨</div>
+        <div className="min-h-screen font-[Nunito,sans-serif] p-4 md:p-6" style={{ background: '#8B5BDB' }}>
+            {/* Panel principal — card flotante más ancha */}
+            <div
+                className="w-full max-w-2xl mx-auto rounded-[28px] overflow-hidden"
+                style={{
+                    background: '#F5F1E8',
+                    border: '2.5px solid #1A1A1A',
+                    boxShadow: '6px 6px 0px #1A1A1A',
+                }}
+            >
+                <div className="p-5 sm:p-6 md:p-8 text-center">
+                    {/* Mensaje principal */}
+                    <h1 className="text-3xl font-black text-gray-900 mb-2">¡Bien hecho!</h1>
+                    <p className="text-gray-500 text-sm mb-6">
+                        Has completado <span className="font-extrabold text-gray-800">{exerciseName}</span>
+                    </p>
 
-                {/* Mensaje principal */}
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">¡Bien hecho!</h1>
-                <p className="text-gray-600 mb-6">
-                    Has completado <span className="font-bold">{exerciseName}</span>
-                </p>
+                    {/* Sección de estado de ánimo */}
+                    <div className="mb-6">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
+                            ¿Cómo te sientes ahora?
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2 md:flex-nowrap">
+                            {moods.map((mood) => (
+                                <button
+                                    key={mood.label}
+                                    onClick={() => handleMoodSelect(mood.label)}
+                                    className={`flex flex-col items-center gap-1 px-3 py-2.5 rounded-2xl border-2 transition-all flex-1 ${
+                                        selectedMood === mood.label
+                                            ? 'border-purple-500 bg-purple-100 scale-105'
+                                            : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                                    }`}
+                                >
+                                    <span className="text-2xl">{mood.emoji}</span>
+                                    <span className="text-xs font-bold text-gray-600">{mood.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-                {/* Sección de estado de ánimo */}
-                <div className="mb-8">
-                    <p className="text-sm text-gray-500 mb-3">¿Cómo te sientes ahora?</p>
-                    <div className="flex flex-wrap justify-center gap-3">
-                        {moods.map((mood) => (
-                            <button
-                                key={mood.label}
-                                onClick={() => handleMoodSelect(mood.label)}
-                                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition ${
-                                    selectedMood === mood.label ? 'bg-green-100 scale-105' : 'hover:bg-gray-100'
-                                }`}
-                            >
-                                <span className="text-3xl">{mood.emoji}</span>
-                                <span className="text-xs text-gray-600">{mood.label}</span>
-                            </button>
-                        ))}
+                    {/* Botones de acción */}
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={handleRepeat}
+                            className="w-full py-3.5 rounded-full font-black text-white text-sm bg-purple-600 hover:bg-purple-700 border-2 border-black transition-all hover:-translate-y-0.5 active:translate-y-0"
+                            style={{ boxShadow: '3px 3px 0px #1A1A1A' }}
+                        >
+                            Repetir ejercicio
+                        </button>
+                        <button
+                            onClick={handleGoToFeed}
+                            className="w-full py-3.5 rounded-full font-black text-sm text-purple-700 bg-white border-2 border-black transition-all hover:-translate-y-0.5 active:translate-y-0"
+                            style={{ boxShadow: '3px 3px 0px #1A1A1A' }}
+                        >
+                            Ir al feed
+                        </button>
                     </div>
                 </div>
-
-                {/* Botones de acción */}
-                <div className="flex flex-col gap-3">
-                    <button
-                        onClick={handleRepeat}
-                        className="w-full py-3 rounded-full font-bold text-white bg-purple-600 hover:bg-purple-700 transition shadow-md"
-                    >
-                        🔄 Repetir ejercicio
-                    </button>
-                    <button
-                        onClick={handleGoToFeed}
-                        className="w-full py-3 rounded-full font-bold text-purple-700 bg-white border-2 border-purple-600 hover:bg-purple-50 transition"
-                    >
-                        🏠 Ir al feed
-                    </button>
-                </div>
-
-                {/* Mensaje adicional */}
-                <p className="text-xs text-gray-400 mt-6">Tu constancia te acerca a nuevos logros</p>
             </div>
         </div>
     );
