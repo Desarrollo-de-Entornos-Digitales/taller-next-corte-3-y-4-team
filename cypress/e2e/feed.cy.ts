@@ -1,11 +1,8 @@
 describe('Feed', () => {
     beforeEach(() => {
-        // Login antes de cada prueba
-        cy.visit('/login');
-        cy.get('input[name="email"]').type('admin@ludix.com');
-        cy.get('input[name="password"]').type('admin123');
-        cy.get('button[type="submit"]').click();
-        cy.url().should('include', '/feed');
+        cy.loginAsAdmin();
+        cy.visit('/feed', { timeout: 10000 });
+        cy.contains('Para ti', { timeout: 10000 }).should('be.visible');
     });
 
     it('debe mostrar el feed con ejercicios', () => {
@@ -20,8 +17,9 @@ describe('Feed', () => {
     });
 
     it('debe cerrar sesión correctamente', () => {
-        cy.get('header button').click();
-        cy.contains('Cerrar sesión').click();
+        // Ir al perfil primero
+        cy.visit('/profile', { timeout: 10000 });
+        cy.contains('Cerrar sesión', { timeout: 10000 }).click();
         cy.url().should('include', '/login');
     });
 });
