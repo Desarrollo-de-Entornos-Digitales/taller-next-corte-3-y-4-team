@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 
 import Button from '@/components/ui/Button';
 import Grid from '@/components/ui/Grid';
@@ -10,7 +11,6 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 
 import { creativeAreaService, CreativeArea } from './services/creative-area.service';
-import onboardingAction from './onboarding.action';
 
 const AREA_EMOJIS: Record<string, string> = {
     'Diseño Gráfico': '🎨',
@@ -44,9 +44,10 @@ export default function Onboarding() {
     const router = useRouter();
     const [areas, setAreas] = useState<CreativeArea[]>([]);
     const [selectedArea, setSelectedArea] = useState<number | null>(null);
+    const [bio, setBio] = useState('');
+    const [location, setLocation] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [done, setDone] = useState(false);
     const [checkingProfile, setCheckingProfile] = useState(true);
 
     // Verificar si el usuario ya tiene perfil
@@ -72,7 +73,6 @@ export default function Onboarding() {
                 });
 
                 if (response.ok) {
-                    // Ya tiene perfil, redirigir al feed
                     router.push('/feed');
                     return;
                 }
@@ -102,11 +102,8 @@ export default function Onboarding() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedArea) return;
-
-        const userId = getUserIdFromToken();
-        if (!userId) {
-            router.push('/login');
+        if (!selectedArea) {
+            setError('Por favor selecciona un área creativa');
             return;
         }
 
@@ -116,18 +113,44 @@ export default function Onboarding() {
             return;
         }
 
+        const userId = getUserIdFromToken();
+        if (!userId) {
+            router.push('/login');
+            return;
+        }
+
         setLoading(true);
+        setError(null);
 
         try {
-            await onboardingAction(selectedArea, userId, token);
-        } catch (err) {
-            console.error('Error al guardar el área, pero continuamos:', err);
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/profiles`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    userId: userId,
+                    creativeAreaId: selectedArea,
+                    bio: bio || null,
+                    location: location || null,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Error al crear el perfil');
+            }
+
+            router.push('/onboarding/success');
+        } catch (err: any) {
+            console.error('Error:', err);
+            setError(err.message || 'Error al guardar tu información');
         } finally {
-            router.push('/feed');
+            setLoading(false);
         }
     };
 
-    // Pantalla de carga mientras verificamos si tiene perfil
     if (checkingProfile) {
         return (
             <div className="min-h-screen bg-[#F5F0E8] flex items-center justify-center">
@@ -136,74 +159,100 @@ export default function Onboarding() {
         );
     }
 
-    // Pantalla de confirmación
-    if (done) {
-        return (
-            <div className="min-h-screen bg-[#F5F0E8] flex flex-col items-center justify-center p-6 text-center">
-                <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
-                    <div className="text-6xl mb-4">🎉✨</div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 mb-4">¡Todo listo!</h1>
-                    <p className="text-gray-500 mb-8">
-                        Ya puedes empezar a desbloquearte con ejercicios diseñados para creativos como tú.
-                    </p>
-                    <Button variant="primary" onClick={() => router.push('/feed')}>
-                        Ir al Home
-                    </Button>
-                    <p className="text-xs text-gray-400 mt-4">Personalizaremos tus recomendaciones según tu área</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="min-h-screen bg-[#F5F0E8] flex flex-col items-center py-8 px-4">
-            <div className="w-full max-w-2xl mx-auto">
-                {/* Logo y paso */}
-                <div className="text-center mb-6">
-                    <div className="text-5xl mb-2">🎨✨</div>
-                    <p className="text-sm text-gray-400">Paso 1 de 1</p>
-                </div>
+        <div className="min-h-screen font-[Nunito,sans-serif] p-4 md:p-6" style={{ background: '#8B5BDB' }}>
+            <div className="flex items-center justify-between mb-6 w-full max-w-2xl mx-auto px-1">
+                <button
+                    onClick={() => router.back()}
+                    className="text-white hover:text-purple-200 transition"
+                    aria-label="Volver"
+                >
+                    <ArrowLeft size={22} strokeWidth={2.5} />
+                </button>
+                <h1 className="text-lg font-black text-white">Completa tu perfil</h1>
+                <div className="w-6" />
+            </div>
 
-                {/* Títulos */}
-                <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Cuéntanos sobre ti</h1>
-                    <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                        Personalizaremos tu experiencia en LUDIX con ejercicios adaptados a tu perfil.
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit}>
-                    <p className="font-bold text-gray-800 mb-4">Área creativa</p>
-
-                    {error && <ErrorMessage message={error} />}
-
-                    {areas.length === 0 ? (
-                        <LoadingSpinner />
-                    ) : (
-                        <Grid cols={2} gap="md">
-                            {areas.map((area) => (
-                                <OptionCard
-                                    key={area.id}
-                                    emoji={AREA_EMOJIS[area.area] ?? '🎨'}
-                                    label={area.area}
-                                    selected={selectedArea === area.id}
-                                    onClick={() => setSelectedArea(area.id)}
-                                />
-                            ))}
-                        </Grid>
-                    )}
-
-                    <div className="mt-8">
-                        <Button
-                            type="submit"
-                            variant="secondary"
-                            disabled={loading || !selectedArea}
-                            className="w-full"
-                        >
-                            {loading ? 'Guardando...' : selectedArea ? 'Siguiente' : 'Selecciona una opción'}
-                        </Button>
+            <div
+                className="w-full max-w-2xl mx-auto rounded-[28px] overflow-hidden"
+                style={{
+                    background: '#F5F1E8',
+                    border: '2.5px solid #1A1A1A',
+                    boxShadow: '6px 6px 0px #1A1A1A',
+                }}
+            >
+                <div className="p-6 sm:p-8">
+                    <div className="text-center mb-6">
+                        <div className="text-5xl mb-2">🎨✨</div>
+                        <p className="text-sm text-gray-400">Paso 1 de 1</p>
                     </div>
-                </form>
+
+                    <div className="text-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Cuéntanos sobre ti</h1>
+                        <p className="text-gray-500 text-sm max-w-xs mx-auto">
+                            Personalizaremos tu experiencia en LUDIX con ejercicios adaptados a tu perfil.
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleSubmit}>
+                        <p className="font-bold text-gray-800 mb-4">Área creativa *</p>
+
+                        {error && <ErrorMessage message={error} />}
+
+                        {areas.length === 0 ? (
+                            <LoadingSpinner />
+                        ) : (
+                            <Grid cols={2} gap="md">
+                                {areas.map((area) => (
+                                    <OptionCard
+                                        key={area.id}
+                                        emoji={AREA_EMOJIS[area.area] ?? '🎨'}
+                                        label={area.area}
+                                        selected={selectedArea === area.id}
+                                        onClick={() => setSelectedArea(area.id)}
+                                    />
+                                ))}
+                            </Grid>
+                        )}
+
+                        <div className="mt-6">
+                            <label className="block text-sm font-bold text-gray-700 mb-2">
+                                Biografía <span className="text-gray-400 font-normal">(opcional)</span>
+                            </label>
+                            <textarea
+                                value={bio}
+                                onChange={(e) => setBio(e.target.value)}
+                                rows={3}
+                                className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition"
+                                placeholder="Cuéntanos un poco sobre ti, tu experiencia, intereses..."
+                            />
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="block text-sm font-bold text-gray-700 mb-2">
+                                Ubicación <span className="text-gray-400 font-normal">(opcional)</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition"
+                                placeholder="Ciudad, País"
+                            />
+                        </div>
+
+                        <div className="mt-8">
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                disabled={loading || !selectedArea}
+                                className="w-full"
+                            >
+                                {loading ? 'Guardando...' : selectedArea ? 'Siguiente' : 'Selecciona una opción'}
+                            </Button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );

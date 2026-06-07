@@ -2,14 +2,17 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import loginAction from './login.action';
 import { useNotifications } from '@/context/NotificationContext';
+import { useLoading } from '@/context/LoadingContext';
 
 export default function LoginPage() {
     const formRef = useRef<HTMLFormElement>(null);
     const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
     const { showNotification } = useNotifications();
+    const { withLoading } = useLoading();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,7 +21,7 @@ export default function LoginPage() {
         const password = String(formData.get('password'));
 
         try {
-            const result = await loginAction(email, password);
+            const result = await withLoading(loginAction(email, password));
             localStorage.setItem('token', result.access_token);
             showNotification('Inicio de sesión exitoso', 'success');
             router.push('/feed');
@@ -30,6 +33,15 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#EDE8DC' }}>
+            {/* Flecha de retroceso */}
+            <button
+                onClick={() => router.back()}
+                className="absolute top-6 left-6 text-gray-500 hover:text-purple-600 transition"
+                aria-label="Volver"
+            >
+                <ArrowLeft size={24} strokeWidth={2.5} />
+            </button>
+
             <div className="w-full max-w-sm bg-white rounded-3xl px-8 pt-10 pb-8 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">¡Bienvenido de vuelta!</h2>
 
@@ -58,17 +70,11 @@ export default function LoginPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-colors"
                             >
-                                {showPassword ? '👁️' : '👁️‍🗨️'}
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
-                    </div>
-
-                    <div className="flex justify-end -mt-2">
-                        <span className="text-xs text-gray-400 cursor-pointer hover:text-purple-500 transition-colors">
-                            Olvidaste tu contraseña?
-                        </span>
                     </div>
 
                     <button

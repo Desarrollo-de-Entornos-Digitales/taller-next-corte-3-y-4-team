@@ -2,12 +2,17 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import registerAction from './register.action';
+import { useNotifications } from '@/context/NotificationContext';
+import { useLoading } from '@/context/LoadingContext';
 
 export default function RegisterPage() {
     const formRef = useRef<HTMLFormElement>(null);
     const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
+    const { showNotification } = useNotifications();
+    const { withLoading } = useLoading();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -15,13 +20,29 @@ export default function RegisterPage() {
         const name = String(formData.get('name'));
         const email = String(formData.get('email'));
         const password = String(formData.get('password'));
-        const result = await registerAction(name, email, password);
-        localStorage.setItem('token', result.access_token);
-        router.push('/onboarding');
+
+        try {
+            const result = await withLoading(registerAction(name, email, password));
+            localStorage.setItem('token', result.access_token);
+            showNotification('Registro exitoso', 'success');
+            router.push('/onboarding');
+        } catch (error: any) {
+            console.error('Error en registro:', error);
+            showNotification(error.message || 'Error al registrar usuario', 'error');
+        }
     };
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#EDE8DC' }}>
+            {/* Flecha de retroceso */}
+            <button
+                onClick={() => router.back()}
+                className="absolute top-6 left-6 text-gray-500 hover:text-purple-600 transition"
+                aria-label="Volver"
+            >
+                <ArrowLeft size={24} strokeWidth={2.5} />
+            </button>
+
             <div className="w-full max-w-sm bg-white rounded-3xl px-8 pt-10 pb-8 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">Crear cuenta</h2>
 
@@ -61,9 +82,9 @@ export default function RegisterPage() {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-colors"
                             >
-                                {showPassword ? '👁️' : '👁️‍🗨️'}
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
                     </div>
