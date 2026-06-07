@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useNotifications } from '@/context/NotificationContext';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 export default function TimerPage() {
     const { id } = useParams();
@@ -13,6 +14,7 @@ export default function TimerPage() {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(true);
     const [loading, setLoading] = useState(true);
+    const [showExitModal, setShowExitModal] = useState(false);
 
     // Cargar datos del ejercicio
     useEffect(() => {
@@ -104,7 +106,16 @@ export default function TimerPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-900 to-purple-700 flex flex-col items-center justify-center p-5">
-            <div className="text-center w-full max-w-md">
+            <div className="text-center w-full max-w-md relative">
+                {/* Botón cerrar (X) */}
+                <button
+                    onClick={() => setShowExitModal(true)}
+                    className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-white/20 text-white hover:bg-white/30 transition flex items-center justify-center"
+                    aria-label="Salir del ejercicio"
+                >
+                    ✕
+                </button>
+
                 <h2 className="text-white text-xl mb-2">{exerciseName}</h2>
 
                 {/* Círculo de progreso */}
@@ -135,20 +146,32 @@ export default function TimerPage() {
                 <div className="flex gap-4 justify-center">
                     <button
                         onClick={() => setIsActive(!isActive)}
-                        className="px-8 py-3 rounded-full font-bold bg-white text-purple-700 hover:bg-gray-100 transition shadow-lg"
+                        className="px-8 py-3 rounded-full font-bold bg-white text-purple-700 border-2 border-black shadow-[3px_3px_0px_#1A1A1A] hover:bg-gray-100 transition"
                     >
                         {isActive ? 'Pausar' : 'Reanudar'}
                     </button>
                     <button
-                        onClick={() => router.back()}
-                        className="px-8 py-3 rounded-full font-bold bg-gray-600 text-white hover:bg-gray-700 transition shadow-lg"
+                        onClick={handleComplete}
+                        className="px-8 py-3 rounded-full font-bold bg-teal-400 text-white hover:bg-teal-500 transition shadow-lg"
                     >
-                        Cancelar
+                        Terminar
                     </button>
                 </div>
 
                 <p className="text-purple-200 text-sm mt-8">Respira profundo y concéntrate en el ejercicio</p>
             </div>
+
+            {/* Modal de confirmación reutilizable */}
+            <ConfirmationModal
+                isOpen={showExitModal}
+                title="¿Salir del ejercicio?"
+                message="Tu progreso no se guardará si sales ahora."
+                confirmText="Salir"
+                cancelText="Continuar"
+                variant="danger"
+                onConfirm={() => router.push('/feed')}
+                onCancel={() => setShowExitModal(false)}
+            />
         </div>
     );
 }
