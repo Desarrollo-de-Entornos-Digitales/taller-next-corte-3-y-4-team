@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-
+import { ArrowLeft, Heart } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
 
 interface Exercise {
@@ -19,107 +19,220 @@ interface ExerciseType {
     type: string;
 }
 
+// Mapa de colores por tipo (mismo que el feed)
+const getTypeColor = (type?: string): string => {
+    const map: Record<string, string> = {
+        Ideación: '#B8E8D0',
+        Desbloqueo: '#F9C8CF',
+        'Pausa activa': '#FFE5A0',
+        Investigación: '#D0C0F0',
+    };
+    return map[type || ''] || '#D0C0F0';
+};
+
+const getExerciseEmoji = (type?: string): string => {
+    const map: Record<string, string> = {
+        Ideación: '💡',
+        Desbloqueo: '🎨',
+        Investigación: '🔍',
+        'Pausa activa': '🧘',
+    };
+    return map[type || ''] || '✨';
+};
+
 export default function CatalogPage() {
     const router = useRouter();
     const { showNotification } = useNotifications();
     const [exercises, setExercises] = useState<Exercise[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [loadingMore, setLoadingMore] = useState(false);
     const [selectedType, setSelectedType] = useState<string>('');
     const [exerciseTypes, setExerciseTypes] = useState<ExerciseType[]>([]);
+    const [favorites, setFavorites] = useState<Set<number>>(new Set());
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [total, setTotal] = useState(0);
 
-    useEffect(() => {
-        const fetchData = async () => {
+    const fetchExercises = useCallback(
+        async (currentPage: number, append: boolean = false) => {
             try {
                 const token = localStorage.getItem('token');
-                if (!token) {
-                    router.push('/login');
-                    return;
+                const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL}/exercises?page=${currentPage}&limit=9`,
+                    { headers: { Authorization: `Bearer ${token}` } },
+                );
+                const data = await response.json();
+
+                let exercisesData = [];
+                let totalCount = 0;
+
+                if (data.data && Array.isArray(data.data)) {
+                    exercisesData = data.data;
+                    totalCount = data.total || 0;
+                } else if (Array.isArray(data)) {
+                    exercisesData = data;
+                    totalCount = data.length;
+                } else {
+                    exercisesData = [];
                 }
 
-                const exercisesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercises`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const exercisesRaw: unknown = await exercisesRes.json();
-                let exercisesData: Exercise[] = [];
-                if (exercisesRaw && !Array.isArray(exercisesRaw)) {
-                    exercisesData = (exercisesRaw as { data: Exercise[] }).data || [];
-                } else if (Array.isArray(exercisesRaw)) {
-                    exercisesData = exercisesRaw as Exercise[];
-                }
-                setExercises(exercisesData);
+                setTotal(totalCount);
 
-                const typesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercise-types`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const typesRaw: unknown = await typesRes.json();
-                let typesData: ExerciseType[] = [];
-                if (typesRaw && !Array.isArray(typesRaw)) {
-                    typesData = (typesRaw as { data: ExerciseType[] }).data || [];
-                } else if (Array.isArray(typesRaw)) {
-                    typesData = typesRaw as ExerciseType[];
+                if (append) {
+                    setExercises((prev) => [...prev, ...exercisesData]);
+                } else {
+                    setExercises(exercisesData);
                 }
-                setExerciseTypes(typesData);
+
+                setHasMore(currentPage * 9 < totalCount);
             } catch (error) {
                 console.error(error);
-                showNotification('Error al cargar el catálogo', 'error');
-            } finally {
-                setLoading(false);
+                showNotification('Error al cargar ejercicios', 'error');
             }
-        };
+        },
+        [showNotification],
+    );
 
-        void fetchData();
-    }, [router, showNotification]);
+    const fetchTypesAndFavorites = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const userId = JSON.parse(atob(token!.split('.')[1])).sub;
+
+            const [typesRes, favRes] = await Promise.all([
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercise-types`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/favorites/user/${userId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
+
+            let typesData = await typesRes.json();
+            typesData = Array.isArray(typesData) ? typesData : typesData.data || [];
+            setExerciseTypes(typesData);
+
+            let favData = await favRes.json();
+            favData = Array.isArray(favData) ? favData : favData.data || [];
+            const favSet = new Set(favData.map((fav: any) => fav.exerciseId));
+            setFavorites(favSet);
+        } catch (error) {
+            console.error(error);
+        }
+    }, []);
+
+    useEffect(() => {
+        const init = async () => {
+            setLoading(true);
+            await Promise.all([fetchExercises(1, false), fetchTypesAndFavorites()]);
+            setLoading(false);
+        };
+        init();
+    }, []);
+
+    const loadMore = async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        const nextPage = page + 1;
+        await fetchExercises(nextPage, true);
+        setPage(nextPage);
+        setLoadingMore(false);
+    };
+
+    const toggleFavorite = async (e: React.MouseEvent, exerciseId: number) => {
+        e.stopPropagation();
+        try {
+            const token = localStorage.getItem('token');
+            const userId = JSON.parse(atob(token!.split('.')[1])).sub;
+
+            if (favorites.has(exerciseId)) {
+                const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL}/favorites/user/${userId}/exercise/${exerciseId}`,
+                    { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+                );
+                if (response.ok) {
+                    setFavorites((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(exerciseId);
+                        return newSet;
+                    });
+                    showNotification('Eliminado de favoritos', 'success');
+                }
+            } else {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/favorites`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ userId, exerciseId }),
+                });
+                if (response.ok) {
+                    setFavorites((prev) => new Set(prev).add(exerciseId));
+                    showNotification('Agregado a favoritos', 'success');
+                }
+            }
+        } catch (error) {
+            showNotification('Error al actualizar favoritos', 'error');
+        }
+    };
 
     const filteredExercises = useMemo(() => {
         let filtered = [...exercises];
-
-        if (searchTerm) {
-            filtered = filtered.filter((ex) => ex.name.toLowerCase().includes(searchTerm.toLowerCase()));
-        }
-
         if (selectedType) {
             filtered = filtered.filter((ex) => ex.exerciseType?.type === selectedType);
         }
-
         return filtered;
-    }, [searchTerm, selectedType, exercises]);
+    }, [selectedType, exercises]);
 
-    if (loading) {
+    if (loading && exercises.length === 0) {
         return (
-            <div className="min-h-screen bg-[#EDE8DC] flex items-center justify-center">
+            <div
+                className="min-h-screen font-[Nunito,sans-serif] flex items-center justify-center"
+                style={{ background: '#8B5BDB' }}
+            >
                 <div className="text-center">
-                    <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-gray-500">Cargando catálogo...</p>
+                    <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-white font-semibold">Cargando catálogo...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#EDE8DC] py-10 px-5">
-            <div className="max-w-6xl mx-auto">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Catálogo de Ejercicios</h1>
-                <p className="text-gray-500 mb-6">{filteredExercises.length} ejercicios disponibles</p>
+        <div className="min-h-screen font-[Nunito,sans-serif] p-4 md:p-6" style={{ background: '#8B5BDB' }}>
+            <div className="flex items-center justify-between mb-6 w-full max-w-7xl mx-auto px-1">
+                <button onClick={() => router.back()} className="text-white hover:text-purple-200 transition">
+                    <ArrowLeft size={22} strokeWidth={2.5} />
+                </button>
+                <h1 className="text-lg font-black text-white">Catálogo de ejercicios</h1>
+                <div className="w-6" />
+            </div>
 
-                {/* Barra de búsqueda y filtros */}
-                <div className="mb-8 space-y-4">
-                    <input
-                        type="text"
-                        placeholder="🔍 Buscar ejercicio..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full px-5 py-3 rounded-full border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition bg-white"
-                    />
+            <div
+                className="w-full max-w-7xl mx-auto rounded-[28px] overflow-hidden"
+                style={{
+                    background: '#F5F1E8',
+                    border: '2.5px solid #1A1A1A',
+                    boxShadow: '6px 6px 0px #1A1A1A',
+                }}
+            >
+                <div className="p-6 sm:p-8">
+                    <p className="text-gray-500 mb-6">{total} ejercicios disponibles</p>
 
-                    <div className="flex flex-wrap gap-2">
+                    {/* Filtros por tipo */}
+                    <div className="mb-8 flex flex-wrap gap-2">
                         <button
                             onClick={() => setSelectedType('')}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                            className={`px-4 py-2 rounded-full text-sm font-black transition-all ${
                                 selectedType === ''
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                                    ? 'text-white'
+                                    : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100'
                             }`}
+                            style={{
+                                background: selectedType === '' ? '#8B5BDB' : 'white',
+                                border: selectedType === '' ? '2px solid #1A1A1A' : '2px solid #E5E7EB',
+                                boxShadow: selectedType === '' ? '2px 2px 0px #1A1A1A' : 'none',
+                            }}
                         >
                             Todos
                         </button>
@@ -127,43 +240,109 @@ export default function CatalogPage() {
                             <button
                                 key={type.id}
                                 onClick={() => setSelectedType(type.type)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                                className={`px-4 py-2 rounded-full text-sm font-black transition-all ${
                                     selectedType === type.type
-                                        ? 'bg-purple-600 text-white'
-                                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                                        ? 'text-white'
+                                        : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-100'
                                 }`}
+                                style={{
+                                    background: selectedType === type.type ? '#8B5BDB' : 'white',
+                                    border: selectedType === type.type ? '2px solid #1A1A1A' : '2px solid #E5E7EB',
+                                    boxShadow: selectedType === type.type ? '2px 2px 0px #1A1A1A' : 'none',
+                                }}
                             >
                                 {type.type}
                             </button>
                         ))}
                     </div>
-                </div>
 
-                {/* Grid de ejercicios */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {filteredExercises.map((exercise) => (
-                        <div
-                            key={exercise.id}
-                            onClick={() => router.push(`/exercises/${exercise.id}`)}
-                            className="bg-white rounded-2xl p-5 shadow-md border border-gray-200 cursor-pointer hover:shadow-lg transition hover:-translate-y-1"
-                        >
-                            <h3 className="font-bold text-gray-900 text-lg mb-1">{exercise.name}</h3>
-                            <p className="text-sm text-gray-500 mb-2 line-clamp-2">{exercise.description}</p>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-500">⏱️ {exercise.duration} min</span>
-                                <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
-                                    {exercise.exerciseType?.type || 'Ejercicio'}
-                                </span>
-                            </div>
+                    {/* Grid de ejercicios */}
+                    {filteredExercises.length === 0 ? (
+                        <div className="text-center py-12">
+                            <p className="text-gray-400 font-semibold">No se encontraron ejercicios</p>
                         </div>
-                    ))}
-                </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                {filteredExercises.map((exercise) => {
+                                    const isFavorite = favorites.has(exercise.id);
+                                    const emoji = getExerciseEmoji(exercise.exerciseType?.type);
+                                    const typeColor = getTypeColor(exercise.exerciseType?.type);
 
-                {filteredExercises.length === 0 && (
-                    <div className="text-center py-12">
-                        <p className="text-gray-400">No se encontraron ejercicios</p>
-                    </div>
-                )}
+                                    return (
+                                        <div
+                                            key={exercise.id}
+                                            onClick={() => router.push(`/exercises/${exercise.id}`)}
+                                            className="bg-white rounded-2xl overflow-hidden cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md relative group"
+                                            style={{
+                                                border: '1px solid #F0EEE8',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                                            }}
+                                        >
+                                            <button
+                                                onClick={(e) => toggleFavorite(e, exercise.id)}
+                                                className="absolute top-4 right-4 z-10 transition-all hover:scale-110"
+                                            >
+                                                <Heart
+                                                    size={18}
+                                                    className={isFavorite ? 'text-red-500' : 'text-gray-300'}
+                                                    fill={isFavorite ? 'currentColor' : 'none'}
+                                                />
+                                            </button>
+
+                                            <div className="p-5">
+                                                <div
+                                                    className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
+                                                    style={{ backgroundColor: `${typeColor}40` }}
+                                                >
+                                                    <span className="text-2xl">{emoji}</span>
+                                                </div>
+
+                                                <h3 className="font-bold text-gray-900 text-base leading-snug mb-2">
+                                                    {exercise.name}
+                                                </h3>
+
+                                                <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed">
+                                                    {exercise.description}
+                                                </p>
+
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm text-gray-400 flex items-center gap-1">
+                                                        🕐 {exercise.duration} min
+                                                    </span>
+                                                    <span
+                                                        className="text-xs px-2 py-1 rounded-full font-black"
+                                                        style={{
+                                                            background: typeColor,
+                                                            color: '#1A1A1A',
+                                                            border: '1.5px solid #1A1A1A',
+                                                        }}
+                                                    >
+                                                        {exercise.exerciseType?.type || 'Ejercicio'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Botón cargar más */}
+                            {hasMore && (
+                                <div className="flex justify-center mt-8">
+                                    <button
+                                        onClick={loadMore}
+                                        disabled={loadingMore}
+                                        className="px-6 py-3 rounded-full font-black text-white bg-purple-600 border-2 border-black transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                                        style={{ boxShadow: '3px 3px 0px #1A1A1A' }}
+                                    >
+                                        {loadingMore ? 'Cargando...' : 'Cargar más ejercicios'}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
