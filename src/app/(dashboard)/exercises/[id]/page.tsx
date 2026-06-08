@@ -1,14 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Dumbbell, Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
 import { useNotifications } from '@/context/NotificationContext';
-
-interface ExerciseType {
-    id: number;
-    type: string;
-}
+import { ArrowLeft, MessageCircle, Heart, ChevronDown, ChevronUp } from 'lucide-react';
+import UserModal from '@/components/ui/UserModal';
 
 interface Exercise {
     id: number;
@@ -16,387 +12,392 @@ interface Exercise {
     description: string;
     duration: number;
     exerciseTypeId: number;
-    exerciseType?: ExerciseType;
-    createdBy?: string;
+    exerciseType?: { id: number; type: string };
     instructions?: string[];
 }
 
-export default function AdminExercisesPage() {
+interface Comment {
+    id: number;
+    content: string;
+    createdAt: string;
+    user: {
+        id: number;
+        name: string;
+    };
+}
+
+// Mapa de imágenes por ID de ejercicio
+const getExerciseImage = (exerciseId: number): string => {
+    const images: Record<number, string> = {
+        1: '/crazy8.png',
+        2: '/scamper.png',
+        3: '/estiramiento-de-manos.png',
+        4: '/dibujo-a-ciegas.png',
+        5: '/mapa-mental.png',
+        6: '/pausa-de-ojos.png',
+    };
+    return images[exerciseId] || '/default-exercise.png';
+};
+
+export default function ExerciseDetailPage() {
+    const { id } = useParams();
     const router = useRouter();
     const { showNotification } = useNotifications();
-    const [exercises, setExercises] = useState<Exercise[]>([]);
-    const [exerciseTypes, setExerciseTypes] = useState<ExerciseType[]>([]);
+    const [exercise, setExercise] = useState<Exercise | null>(null);
+    const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        duration: 5,
-        exerciseTypeId: 1,
-        instructions: '',
-    });
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [hasCompleted, setHasCompleted] = useState(false);
+    const [newComment, setNewComment] = useState('');
+    const [showComments, setShowComments] = useState(false);
+    const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+    const [selectedUserName, setSelectedUserName] = useState('');
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        const fetchData = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    router.push('/login');
+                    return;
+                }
 
-    const fetchData = async () => {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const userId = payload.sub;
+
+                // 1. Cargar ejercicio
+                const exerciseRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercises/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const exerciseData = await exerciseRes.json();
+
+                // Procesar instrucciones
+                let instructionsArray = exerciseData.instructions;
+                if (typeof instructionsArray === 'string') {
+                    try {
+                        instructionsArray = JSON.parse(instructionsArray);
+                    } catch {
+                        instructionsArray = [instructionsArray];
+                    }
+                }
+                if (!instructionsArray || instructionsArray.length === 0) {
+                    instructionsArray = [
+                        'Encuentra un lugar tranquilo y sin distracciones.',
+                        'Lee la descripción del ejercicio con atención.',
+                        'Realiza el ejercicio a tu propio ritmo.',
+                        'Al finalizar, reflexiona sobre cómo te sientes.',
+                    ];
+                }
+                exerciseData.instructions = instructionsArray;
+                setExercise(exerciseData);
+
+                // 2. Verificar favorito
+                const favRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/favorites/user/${userId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const favData = await favRes.json();
+                const favoritesArray = Array.isArray(favData) ? favData : favData.data || [];
+                setIsFavorite(favoritesArray.some((fav: any) => fav.exerciseId === Number(id)));
+
+                // 3. Verificar si ya completó el ejercicio
+                const historyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercise-history/user/${userId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const historyData = await historyRes.json();
+                const historyArray = Array.isArray(historyData) ? historyData : historyData.data || [];
+                setHasCompleted(
+                    historyArray.some((h: any) => {
+                        const exId = h.exercise?.id || h.exerciseId;
+                        return exId === Number(id);
+                    }),
+                );
+
+                // 4. Cargar comentarios
+                const commentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/comments/exercise/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                let commentsData = await commentsRes.json();
+                if (commentsData && !Array.isArray(commentsData)) {
+                    commentsData = commentsData.data || [];
+                }
+                setComments(commentsData);
+            } catch (error) {
+                console.error(error);
+                showNotification('Error al cargar el ejercicio', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) fetchData();
+    }, [id, router, showNotification]);
+
+    const toggleFavorite = async () => {
         try {
             const token = localStorage.getItem('token');
-
-            // Cargar ejercicios
-            const exercisesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercises`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            let exercisesData = await exercisesRes.json();
-            if (exercisesData && !Array.isArray(exercisesData)) {
-                exercisesData = exercisesData.data || [];
+            if (!token) {
+                showNotification('Debes iniciar sesión', 'error');
+                return;
             }
-            setExercises(exercisesData);
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const userId = payload.sub;
 
-            // Cargar tipos de ejercicio
-            const typesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercise-types`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            let typesData = await typesRes.json();
-            if (typesData && !Array.isArray(typesData)) {
-                typesData = typesData.data || [];
-            }
-            setExerciseTypes(typesData);
-        } catch (error) {
-            console.error(error);
-            showNotification('Error al cargar datos', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCreate = () => {
-        setEditingExercise(null);
-        setFormData({
-            name: '',
-            description: '',
-            duration: 5,
-            exerciseTypeId: exerciseTypes[0]?.id || 1,
-            instructions: '',
-        });
-        setShowModal(true);
-    };
-
-    const handleEdit = (exercise: Exercise) => {
-        setEditingExercise(exercise);
-        setFormData({
-            name: exercise.name,
-            description: exercise.description,
-            duration: exercise.duration,
-            exerciseTypeId: exercise.exerciseTypeId,
-            instructions: Array.isArray(exercise.instructions)
-                ? exercise.instructions.join('\n')
-                : exercise.instructions || '',
-        });
-        setShowModal(true);
-    };
-
-    const handleDelete = async (exercise: Exercise) => {
-        if (!confirm(`¿Eliminar el ejercicio "${exercise.name}"?`)) return;
-
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/exercises/${exercise.id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (response.ok) {
-                showNotification(`Ejercicio "${exercise.name}" eliminado`, 'success');
-                fetchData();
+            if (isFavorite) {
+                const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL}/favorites/user/${userId}/exercise/${id}`,
+                    { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+                );
+                if (response.ok) {
+                    setIsFavorite(false);
+                    showNotification('Eliminado de favoritos', 'success');
+                } else throw new Error();
             } else {
-                throw new Error();
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/favorites`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ userId, exerciseId: Number(id) }),
+                });
+                if (response.ok) {
+                    setIsFavorite(true);
+                    showNotification('Agregado a favoritos', 'success');
+                } else throw new Error();
             }
         } catch {
-            showNotification('Error al eliminar ejercicio', 'error');
+            showNotification('Error al actualizar favoritos', 'error');
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!formData.name || !formData.description || formData.duration <= 0) {
-            showNotification('Completa todos los campos correctamente', 'error');
-            return;
-        }
-
+    const handleAddComment = async () => {
+        if (!newComment.trim()) return;
         try {
             const token = localStorage.getItem('token');
-            const url = editingExercise
-                ? `${process.env.NEXT_PUBLIC_API_URL}/exercises/${editingExercise.id}`
-                : `${process.env.NEXT_PUBLIC_API_URL}/exercises`;
+            const payload = JSON.parse(atob(token!.split('.')[1]));
+            const userId = payload.sub;
 
-            const method = editingExercise ? 'PUT' : 'POST';
-
-            const instructionsText = formData.instructions.trim() || null;
-
-            const payload = {
-                name: formData.name,
-                description: formData.description,
-                duration: formData.duration,
-                exerciseTypeId: formData.exerciseTypeId,
-                instructions: instructionsText,
-                createdBy: 'admin',
-            };
-
-            console.log('📤 Enviando ejercicio:', JSON.stringify(payload, null, 2));
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(payload),
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ userId, exerciseId: Number(id), content: newComment }),
             });
-
-            console.log('📡 Status:', response.status);
-            console.log('📡 OK?', response.ok);
-
-            const responseText = await response.text();
-            console.log('📡 Respuesta raw:', responseText);
-
-            if (!response.ok) {
-                let errorMessage = 'Error al guardar ejercicio';
-                try {
-                    const errorData = JSON.parse(responseText);
-                    errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
-                } catch {
-                    errorMessage = responseText || 'Error desconocido';
-                }
-                throw new Error(errorMessage);
-            }
-
-            const data = JSON.parse(responseText);
-            console.log('✅ Respuesta éxito:', data);
-
-            showNotification(editingExercise ? 'Ejercicio actualizado' : 'Ejercicio creado', 'success');
-            setShowModal(false);
-            fetchData();
-        } catch (error: any) {
-            console.error('❌ Error detallado:', error);
-            showNotification(error.message || 'Error al guardar ejercicio', 'error');
+            if (response.ok) {
+                const newCommentData = await response.json();
+                setComments([newCommentData, ...comments]);
+                setNewComment('');
+                showNotification('Comentario agregado', 'success');
+            } else throw new Error();
+        } catch {
+            showNotification('Error al agregar comentario', 'error');
         }
     };
+
+    const getInitials = (name: string) =>
+        name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
 
     if (loading) {
         return (
-            <div
-                className="min-h-screen font-[Nunito,sans-serif] flex items-center justify-center"
-                style={{ background: '#8B5BDB' }}
-            >
+            <div className="min-h-screen bg-[#8B5BDB] flex items-center justify-center">
                 <div className="text-center">
                     <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-white font-semibold">Cargando ejercicios...</p>
+                    <p className="text-white font-semibold">Cargando ejercicio...</p>
                 </div>
+            </div>
+        );
+    }
+
+    if (!exercise) {
+        return (
+            <div className="min-h-screen bg-[#8B5BDB] flex items-center justify-center">
+                <p className="text-white">Ejercicio no encontrado</p>
             </div>
         );
     }
 
     return (
         <div className="min-h-screen font-[Nunito,sans-serif] p-4 md:p-6" style={{ background: '#8B5BDB' }}>
-            <div className="flex items-center justify-between mb-6 w-full max-w-6xl mx-auto px-1">
-                <button onClick={() => router.back()} className="text-white hover:text-purple-200 transition">
-                    <ArrowLeft size={22} strokeWidth={2.5} />
-                </button>
-                <h1 className="text-lg font-black text-white">Gestionar ejercicios</h1>
-                <button
-                    onClick={handleCreate}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-black bg-white text-purple-600 border-2 border-black transition-all hover:-translate-y-0.5"
-                    style={{ boxShadow: '3px 3px 0px #1A1A1A' }}
-                >
-                    <Plus size={16} /> Nuevo ejercicio
-                </button>
-            </div>
-
+            {/* Panel principal — card flotante */}
             <div
-                className="w-full max-w-6xl mx-auto rounded-[28px] overflow-hidden"
+                className="w-full max-w-4xl mx-auto rounded-[28px] overflow-hidden"
                 style={{
                     background: '#F5F1E8',
                     border: '2.5px solid #1A1A1A',
                     boxShadow: '6px 6px 0px #1A1A1A',
                 }}
             >
-                <div className="p-6">
-                    <p className="text-gray-500 mb-4">{exercises.length} ejercicios en total</p>
+                <div className="p-5 sm:p-6 md:p-8">
+                    {/* Botón volver */}
+                    <button
+                        onClick={() => router.back()}
+                        className="mb-5 text-gray-500 hover:text-purple-600 transition flex items-center gap-1"
+                    >
+                        <ArrowLeft size={20} strokeWidth={2.5} />
+                    </button>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="border-b-2 border-black">
-                                <tr>
-                                    <th className="text-left py-3 px-2 text-gray-700 font-bold">ID</th>
-                                    <th className="text-left py-3 px-2 text-gray-700 font-bold">Nombre</th>
-                                    <th className="text-left py-3 px-2 text-gray-700 font-bold">Tipo</th>
-                                    <th className="text-center py-3 px-2 text-gray-700 font-bold">Duración</th>
-                                    <th className="text-center py-3 px-2 text-gray-700 font-bold">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {exercises.map((exercise) => (
-                                    <tr key={exercise.id} className="border-b border-gray-200">
-                                        <td className="py-3 px-2 font-mono text-gray-900">{exercise.id}</td>
-                                        <td className="py-3 px-2 font-semibold text-gray-900">{exercise.name}</td>
-                                        <td className="py-3 px-2">
-                                            <span className="px-2 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
-                                                {exercise.exerciseType?.type || 'Sin tipo'}
-                                            </span>
-                                        </td>
-                                        <td className="py-3 px-2 text-center text-gray-900">{exercise.duration} min</td>
-                                        <td className="py-3 px-2 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => handleEdit(exercise)}
-                                                    className="p-1 text-blue-500 hover:text-blue-700 transition"
-                                                >
-                                                    <Edit size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(exercise)}
-                                                    className="p-1 text-red-500 hover:text-red-700 transition"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {/* Título centrado */}
+                    <h1 className="text-2xl md:text-3xl font-black text-gray-900 mb-3 leading-tight text-center">
+                        {exercise.name}
+                    </h1>
+
+                    {/* Descripción centrada */}
+                    <p className="text-gray-500 text-sm leading-relaxed mb-6 text-center max-w-2xl mx-auto">
+                        {exercise.description}
+                    </p>
+
+                    {/* Imagen del ejercicio personalizada */}
+                    <div className="relative w-full h-48 md:h-64 bg-[#e8e0f0] rounded-2xl flex items-center justify-center mb-6 border-2 border-black overflow-hidden">
+                        <img
+                            src={getExerciseImage(exercise.id)}
+                            alt={exercise.name}
+                            className="w-full h-full object-contain p-4"
+                        />
+                        <button
+                            onClick={toggleFavorite}
+                            className={`absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center border-2 border-black transition-transform hover:scale-110 active:scale-95 ${
+                                isFavorite ? 'bg-red-50' : 'bg-white'
+                            }`}
+                        >
+                            <Heart
+                                size={18}
+                                className={isFavorite ? 'text-red-500' : 'text-gray-400'}
+                                fill={isFavorite ? 'currentColor' : 'none'}
+                                strokeWidth={2.5}
+                            />
+                        </button>
+                    </div>
+
+                    {/* Tipo y duración */}
+                    <div className="flex items-center gap-2 mb-6">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                            {exercise.exerciseType?.type || 'Ejercicio'}
+                        </span>
+                        <span className="text-gray-300">•</span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                            ⏱ {exercise.duration} min
+                        </span>
+                    </div>
+
+                    {/* Instrucciones */}
+                    <div className="bg-white rounded-xl p-5 mb-6 border-2 border-black">
+                        <p className="text-sm font-extrabold text-gray-700 mb-3">📋 Instrucciones</p>
+                        <ul className="space-y-2.5">
+                            {exercise.instructions?.map((inst: string, idx: number) => (
+                                <li key={idx} className="flex items-start gap-3 text-sm text-gray-600 leading-snug">
+                                    <span className="min-w-[20px] h-5 rounded-full bg-purple-600 text-white text-xs font-black flex items-center justify-center mt-0.5 flex-shrink-0">
+                                        {idx + 1}
+                                    </span>
+                                    {inst}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {/* Botón comenzar */}
+                    <button
+                        onClick={() => router.push(`/exercises/${exercise.id}/timer`)}
+                        className="w-full py-3.5 rounded-full font-black text-white text-base bg-purple-600 hover:bg-purple-700 border-2 border-black transition-all hover:-translate-y-0.5 active:translate-y-0"
+                    >
+                        Comenzar ahora
+                    </button>
+
+                    {/* Sección comentarios */}
+                    <div className="mt-6 bg-white rounded-xl border-2 border-black overflow-hidden">
+                        <button
+                            onClick={() => setShowComments(!showComments)}
+                            className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#faf9f6] transition"
+                        >
+                            <div className="flex items-center gap-3">
+                                <MessageCircle size={18} className="text-purple-600" />
+                                <span className="text-sm font-extrabold text-gray-800">
+                                    Comentarios de la comunidad
+                                </span>
+                            </div>
+                            {showComments ? (
+                                <ChevronUp size={16} className="text-gray-400" />
+                            ) : (
+                                <ChevronDown size={16} className="text-gray-400" />
+                            )}
+                        </button>
+
+                        {showComments && (
+                            <div className="px-5 pb-5 border-t border-gray-100">
+                                {!hasCompleted ? (
+                                    <div className="flex flex-col items-center gap-1.5 py-6 text-center">
+                                        <span className="text-3xl">🔒</span>
+                                        <p className="text-sm font-bold text-gray-500">
+                                            Completa este ejercicio para desbloquear
+                                        </p>
+                                        <p className="text-xs text-gray-400">los comentarios de la comunidad</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex gap-2 pt-4 mb-4">
+                                            <input
+                                                type="text"
+                                                value={newComment}
+                                                onChange={(e) => setNewComment(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                                                placeholder="Escribe tu comentario..."
+                                                className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-400 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition"
+                                            />
+                                            <button
+                                                onClick={handleAddComment}
+                                                className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-black border-2 border-black transition"
+                                            >
+                                                Publicar
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                                            {comments.length === 0 ? (
+                                                <p className="text-sm text-gray-400 text-center py-4">
+                                                    No hay comentarios aún. ¡Sé el primero! 🌟
+                                                </p>
+                                            ) : (
+                                                comments.map((comment) => (
+                                                    <div key={comment.id} className="bg-[#f5f2eb] rounded-xl p-3">
+                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                            <div className="w-7 h-7 rounded-full bg-purple-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
+                                                                {getInitials(comment.user?.name || 'U')}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedUserId(comment.user.id);
+                                                                    setSelectedUserName(comment.user.name);
+                                                                }}
+                                                                className="text-xs font-black text-gray-700 hover:text-purple-600 hover:underline cursor-pointer"
+                                                            >
+                                                                {comment.user?.name || 'Usuario'}
+                                                            </button>
+                                                            <span className="text-xs text-gray-400">
+                                                                {new Date(comment.createdAt).toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 leading-snug pl-9">
+                                                            {comment.content}
+                                                        </p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Modal para crear/editar ejercicio */}
-            {showModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-                    onClick={() => setShowModal(false)}
-                >
-                    <div
-                        className="w-full max-w-md mx-4 rounded-[28px] overflow-hidden max-h-[90vh] overflow-y-auto"
-                        style={{
-                            background: '#F5F1E8',
-                            border: '2.5px solid #1A1A1A',
-                            boxShadow: '6px 6px 0px #1A1A1A',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="p-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <Dumbbell size={24} className="text-purple-600" />
-                                    <h3 className="text-lg font-black text-gray-900">
-                                        {editingExercise ? 'Editar ejercicio' : 'Nuevo ejercicio'}
-                                    </h3>
-                                </div>
-                                <button
-                                    onClick={() => setShowModal(false)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Nombre</label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border-2 border-gray-300 bg-white text-gray-900 focus:border-purple-500 outline-none transition"
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Descripción</label>
-                                    <textarea
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        rows={3}
-                                        className="w-full px-4 py-2 rounded-xl border-2 border-gray-300 bg-white text-gray-900 focus:border-purple-500 outline-none transition"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">Tipo</label>
-                                        <select
-                                            value={formData.exerciseTypeId}
-                                            onChange={(e) =>
-                                                setFormData({ ...formData, exerciseTypeId: parseInt(e.target.value) })
-                                            }
-                                            className="w-full px-4 py-2 rounded-xl border-2 border-gray-300 bg-white text-gray-900 focus:border-purple-500 outline-none transition"
-                                        >
-                                            {exerciseTypes.map((type) => (
-                                                <option key={type.id} value={type.id}>
-                                                    {type.type}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                                            Duración (min)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={formData.duration}
-                                            onChange={(e) =>
-                                                setFormData({ ...formData, duration: parseInt(e.target.value) || 0 })
-                                            }
-                                            className="w-full px-4 py-2 rounded-xl border-2 border-gray-300 bg-white text-gray-900 focus:border-purple-500 outline-none transition"
-                                            min="1"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                                        Instrucciones (una por línea)
-                                    </label>
-                                    <textarea
-                                        value={formData.instructions}
-                                        onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                                        rows={5}
-                                        className="w-full px-4 py-2 rounded-xl border-2 border-gray-300 bg-white text-gray-900 focus:border-purple-500 outline-none transition"
-                                        placeholder="Paso 1: ...&#10;Paso 2: ...&#10;Paso 3: ..."
-                                    />
-                                </div>
-
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowModal(false)}
-                                        className="flex-1 py-2 rounded-xl font-black text-gray-700 bg-white border-2 border-black transition-all hover:-translate-y-0.5"
-                                        style={{ boxShadow: '3px 3px 0px #1A1A1A' }}
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 py-2 rounded-xl font-black text-white bg-purple-600 border-2 border-black transition-all hover:bg-purple-700 hover:-translate-y-0.5"
-                                        style={{ boxShadow: '3px 3px 0px #1A1A1A' }}
-                                    >
-                                        <Save size={16} className="inline mr-1" />
-                                        {editingExercise ? 'Actualizar' : 'Crear'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modal de usuario */}
+            <UserModal
+                userId={selectedUserId || 0}
+                userName={selectedUserName}
+                isOpen={selectedUserId !== null}
+                onClose={() => setSelectedUserId(null)}
+            />
         </div>
     );
 }
