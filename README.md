@@ -6,7 +6,7 @@
 
 _Supera el bloqueo creativo con ejercicios guiados, gamificación y comunidad_
 
-[Frontend](taller-next-corte-3-y-4-team.vercel.app) · [Documentación API](https://ludix-backend-production.up.railway.app/api) · [Backend](https://ludix-backend-production.up.railway.app) · [Figma](https://www.figma.com/design/JJHPU9YyjhCcyDmMsFkT5R/Pantallas?node-id=19-2&t=qKnz9h0Mwd6Vec4L-1)
+[Frontend](https://taller-next-corte-3-y-4-team.vercel.app/) · [Documentación API](https://ludix-backend-production.up.railway.app/api) · [Backend](https://ludix-backend-production.up.railway.app) · [Figma](https://www.figma.com/design/JJHPU9YyjhCcyDmMsFkT5R/Pantallas?node-id=19-2&t=qKnz9h0Mwd6Vec4L-1)
 
 </div>
 
